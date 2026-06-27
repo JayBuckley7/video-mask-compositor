@@ -467,6 +467,10 @@
 
     const el = id => document.getElementById(id);
 
+    function hasCanvasSize() {
+      return state.width > 0 && state.height > 0;
+    }
+
     function colorToRgba(color, alpha) {
       const hex = color.replace('#', '');
       const value = parseInt(hex.length === 3
@@ -539,7 +543,11 @@
         if (!state.base) {
           state.width = video.videoWidth;
           state.height = video.videoHeight;
+          resetMasks();
           fitToScreen();
+          state.viewMode = 'video';
+          el('maskViewBtn').classList.remove('active');
+          el('videoViewBtn').classList.add('active');
         }
         updateInfo();
         updateStatus();
@@ -757,7 +765,7 @@
     }
 
     function loadMaskFile(file, idx) {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       loadImageFile(file, img => {
         pushHistory();
         const m = state.masks[idx];
@@ -782,7 +790,7 @@
     }
 
     function fitToScreen() {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       const rect = view.getBoundingClientRect();
       const pad = 36;
       state.zoom = Math.min((rect.width - pad) / state.width, (rect.height - pad) / state.height);
@@ -792,7 +800,7 @@
     }
 
     function actualSize() {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       const rect = view.getBoundingClientRect();
       state.zoom = 1;
       state.panX = (rect.width - state.width) / 2;
@@ -890,7 +898,7 @@
     }
 
     function nudgeSelection(dx, dy) {
-      if (!state.selection || !state.base) return;
+      if (!state.selection || !hasCanvasSize()) return;
       pushHistory();
       moveSelectionPixels(state.selection, dx, dy);
       updateInfo();
@@ -950,11 +958,7 @@
       ctx.scale(state.zoom, state.zoom);
       ctx.imageSmoothingEnabled = true;
       if (state.viewMode === 'video' && state.videoReady) {
-        if (state.base) {
-          drawVideoComposite();
-        } else {
-          ctx.drawImage(video, 0, 0, state.width, state.height);
-        }
+        drawVideoComposite();
       } else {
         ctx.drawImage(state.base, 0, 0);
         drawMaskOverlay(0, colorToRgba(state.maskColors[0], state.opacity[0]));
@@ -970,16 +974,18 @@
     function drawVideoComposite() {
       ctx.drawImage(video, 0, 0, state.width, state.height);
       const mask = state.masks[state.active];
-      if (!mask) return;
-
-      const stillCutout = document.createElement('canvas');
-      stillCutout.width = state.width;
-      stillCutout.height = state.height;
-      const sctx = stillCutout.getContext('2d');
-      sctx.drawImage(state.base, 0, 0, state.width, state.height);
-      sctx.globalCompositeOperation = 'destination-in';
-      sctx.drawImage(mask, 0, 0, state.width, state.height);
-      ctx.drawImage(stillCutout, 0, 0);
+      if (state.base && mask) {
+        const stillCutout = document.createElement('canvas');
+        stillCutout.width = state.width;
+        stillCutout.height = state.height;
+        const sctx = stillCutout.getContext('2d');
+        sctx.drawImage(state.base, 0, 0, state.width, state.height);
+        sctx.globalCompositeOperation = 'destination-in';
+        sctx.drawImage(mask, 0, 0, state.width, state.height);
+        ctx.drawImage(stillCutout, 0, 0);
+      }
+      drawMaskOverlay(0, colorToRgba(state.maskColors[0], state.opacity[0]));
+      drawMaskOverlay(1, colorToRgba(state.maskColors[1], state.opacity[1]));
       drawSelection();
       drawCursorPreview();
     }
@@ -1414,7 +1420,7 @@
     }
 
     function exportMask(idx) {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       const out = document.createElement('canvas');
       out.width = state.width;
       out.height = state.height;
@@ -1451,7 +1457,7 @@
     }
 
     function clearActive() {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       pushHistory();
       state.masks[state.active].getContext('2d').clearRect(0, 0, state.width, state.height);
       updateInfo();
@@ -1459,7 +1465,7 @@
     }
 
     function invertActive() {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       pushHistory();
       const mctx = state.masks[state.active].getContext('2d');
       const data = mctx.getImageData(0, 0, state.width, state.height);
@@ -1575,7 +1581,7 @@
     });
 
     view.addEventListener('pointerdown', e => {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       state.cursor = imagePoint(e);
       view.setPointerCapture(e.pointerId);
       if (e.button === 1 || state.space) {
@@ -1607,7 +1613,7 @@
     });
 
     view.addEventListener('pointermove', e => {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       state.cursor = imagePoint(e);
       updateInfo();
       if (state.panning && state.last) {
@@ -1674,7 +1680,7 @@
     });
 
     view.addEventListener('wheel', e => {
-      if (!state.base) return;
+      if (!hasCanvasSize()) return;
       e.preventDefault();
       const rect = view.getBoundingClientRect();
       const mx = e.clientX - rect.left;
