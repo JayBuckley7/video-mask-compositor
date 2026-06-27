@@ -114,7 +114,7 @@
 
     .mask-row {
       display: grid;
-      grid-template-columns: 1fr 46px 84px;
+      grid-template-columns: 1fr 46px 84px 56px;
       gap: 8px;
       align-items: center;
       padding: 8px;
@@ -129,6 +129,10 @@
 
     .mask-row button {
       padding: 6px 8px;
+    }
+
+    .mask-row input[type="file"] {
+      display: none;
     }
 
     .mask-row input[type="color"] {
@@ -307,12 +311,6 @@
       <h2>Images</h2>
       <label>Base image</label>
       <input id="baseFile" type="file" accept="image/*" />
-
-      <label><span class="swatch mask-a"></span>Mask A</label>
-      <input id="maskAFile" type="file" accept="image/*" />
-
-      <label><span class="swatch mask-b"></span>Mask B</label>
-      <input id="maskBFile" type="file" accept="image/*" />
 
       <h2>Video Paste</h2>
       <label>Input video</label>
@@ -605,7 +603,21 @@
           draw();
         });
         opacityWrap.append(opacityValue, opacityInput);
-        row.append(selectBtn, colorInput, opacityWrap);
+
+        const loadBtn = document.createElement('button');
+        loadBtn.textContent = 'Load';
+        loadBtn.className = 'mini-btn';
+        loadBtn.title = `Load image into ${maskName(idx)}`;
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.addEventListener('change', e => {
+          if (e.target.files[0]) loadMaskFile(e.target.files[0], idx);
+          e.target.value = '';
+        });
+        loadBtn.addEventListener('click', () => fileInput.click());
+
+        row.append(selectBtn, colorInput, opacityWrap, loadBtn, fileInput);
         list.appendChild(row);
       });
       el('deleteMaskBtn').disabled = state.maskColors.length <= 1;
@@ -1660,8 +1672,6 @@
       el('fpsValue').textContent = `${state.exportFps}`;
       updateStatus();
     });
-    el('maskAFile').addEventListener('change', e => e.target.files[0] && loadMaskFile(e.target.files[0], 0));
-    el('maskBFile').addEventListener('change', e => e.target.files[0] && loadMaskFile(e.target.files[0], 1));
     el('addMaskBtn').addEventListener('click', addMask);
     el('deleteMaskBtn').addEventListener('click', deleteActiveMask);
     el('paintMode').addEventListener('click', () => setMode('paint'));
