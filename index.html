@@ -468,7 +468,7 @@
       active: 0,
       mode: 'paint',
       opacity: [0.55],
-      maskColors: ['#ff4048'],
+      maskColors: ['#ff4d5a'],
       brush: 36,
       strength: 1,
       zoom: 1,
@@ -490,6 +490,8 @@
     };
 
     const el = id => document.getElementById(id);
+    const maskPalette = ['#ff4d5a', '#4db7ff', '#6ddc75', '#ffd24a'];
+    const maskOpacityPresets = [0.4, 0.5, 0.6, 0.7];
 
     function hasCanvasSize() {
       return state.width > 0 && state.height > 0;
@@ -500,8 +502,15 @@
     }
 
     function defaultMaskColor(idx) {
-      const colors = ['#ff4048', '#4bb2ff', '#72d26d', '#f3c64d', '#d36dff', '#ff8a3d'];
-      return colors[idx % colors.length];
+      return maskPalette[idx % maskPalette.length];
+    }
+
+    function randomMaskColor() {
+      return maskPalette[Math.floor(Math.random() * maskPalette.length)];
+    }
+
+    function randomMaskOpacity() {
+      return maskOpacityPresets[Math.floor(Math.random() * maskOpacityPresets.length)];
     }
 
     function ensureMaskSettings(idx) {
@@ -626,8 +635,8 @@
 
     function addMask() {
       const idx = state.maskColors.length;
-      state.maskColors.push(defaultMaskColor(idx));
-      state.opacity.push(0.55);
+      state.maskColors.push(randomMaskColor());
+      state.opacity.push(randomMaskOpacity());
       state.masks.push(hasCanvasSize() ? makeMaskCanvas() : null);
       setActive(idx);
       renderSegments();
