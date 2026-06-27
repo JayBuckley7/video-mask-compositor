@@ -398,7 +398,7 @@
       <h2>Export</h2>
       <div class="button-grid">
         <button id="saveA" class="primary">Save Active</button>
-        <button id="saveB" class="primary">Save Mask 1</button>
+        <button id="saveB" class="primary">Save Mask 2</button>
         <button id="saveBoth">Save All</button>
         <button id="saveOverlay">Save Overlay</button>
       </div>
@@ -432,7 +432,7 @@
         <div>Segments</div><div id="segmentsInfo" class="value">0</div>
         <div>Total</div><div id="sequenceTotalInfo" class="value">0.00s</div>
         <div>Progress</div><div id="progressInfo" class="value">idle</div>
-        <div>Masks</div><div id="masksInfo" class="value">2</div>
+        <div>Masks</div><div id="masksInfo" class="value">1</div>
         <div>Active</div><div id="activeInfo" class="value">Mask 1</div>
         <div>Cursor</div><div id="cursorInfo" class="value">-</div>
         <div>Selection</div><div id="selectionInfo" class="value">none</div>
@@ -464,11 +464,11 @@
       currentSegmentIndex: -1,
       width: 0,
       height: 0,
-      masks: [null, null],
+      masks: [null],
       active: 0,
       mode: 'paint',
-      opacity: [0.55, 0.45],
-      maskColors: ['#ff4048', '#4bb2ff'],
+      opacity: [0.55],
+      maskColors: ['#ff4048'],
       brush: 36,
       strength: 1,
       zoom: 1,
@@ -621,6 +621,7 @@
         list.appendChild(row);
       });
       el('deleteMaskBtn').disabled = state.maskColors.length <= 1;
+      el('saveB').disabled = state.maskColors.length < 2;
     }
 
     function addMask() {
