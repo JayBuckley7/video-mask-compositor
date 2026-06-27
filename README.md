@@ -17,6 +17,10 @@ It is not meant to replace a real NLE or image editor. It is meant to be the fas
 
 ## Quick Start
 
+Use the hosted app here:
+
+https://jaybuckley7.github.io/video-mask-compositor/
+
 Open `index.html` in a browser.
 
 No install step is required. Everything runs locally in the browser.
