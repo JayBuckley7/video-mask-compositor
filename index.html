@@ -107,6 +107,42 @@
       grid-template-columns: repeat(3, 1fr);
     }
 
+    .mask-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .mask-row {
+      display: grid;
+      grid-template-columns: 1fr 46px 84px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+
+    .mask-row.active {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+
+    .mask-row button {
+      padding: 6px 8px;
+    }
+
+    .mask-row input[type="color"] {
+      width: 38px;
+      height: 28px;
+    }
+
+    .mask-opacity {
+      display: grid;
+      gap: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
     .nudge-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -314,20 +350,11 @@
       </div>
 
       <h2>Layer</h2>
-      <div class="segmented">
-        <button id="selectA" class="active">Mask A</button>
-        <button id="selectB">Mask B</button>
+      <div class="button-grid" style="margin-bottom: 8px;">
+        <button id="addMaskBtn">Add Mask</button>
+        <button id="deleteMaskBtn" class="danger">Delete Active</button>
       </div>
-
-      <label>Mask A opacity <span id="opacityAValue" class="value">55%</span></label>
-      <input id="opacityA" type="range" min="0" max="100" value="55" />
-
-      <label class="row">Mask A color <input id="colorA" type="color" value="#ff4048" /></label>
-
-      <label>Mask B opacity <span id="opacityBValue" class="value">45%</span></label>
-      <input id="opacityB" type="range" min="0" max="100" value="45" />
-
-      <label class="row">Mask B color <input id="colorB" type="color" value="#4bb2ff" /></label>
+      <div id="maskList" class="mask-list"></div>
 
       <h2>Brush</h2>
       <div class="segmented tools">
@@ -372,9 +399,9 @@
     <aside class="right">
       <h2>Export</h2>
       <div class="button-grid">
-        <button id="saveA" class="primary">Save Mask A</button>
-        <button id="saveB" class="primary">Save Mask B</button>
-        <button id="saveBoth">Save Both</button>
+        <button id="saveA" class="primary">Save Active</button>
+        <button id="saveB" class="primary">Save Mask 1</button>
+        <button id="saveBoth">Save All</button>
         <button id="saveOverlay">Save Overlay</button>
       </div>
 
@@ -407,9 +434,8 @@
         <div>Segments</div><div id="segmentsInfo" class="value">0</div>
         <div>Total</div><div id="sequenceTotalInfo" class="value">0.00s</div>
         <div>Progress</div><div id="progressInfo" class="value">idle</div>
-        <div>Mask A</div><div id="maskAInfo" class="value">empty</div>
-        <div>Mask B</div><div id="maskBInfo" class="value">empty</div>
-        <div>Active</div><div id="activeInfo" class="value">Mask A</div>
+        <div>Masks</div><div id="masksInfo" class="value">2</div>
+        <div>Active</div><div id="activeInfo" class="value">Mask 1</div>
         <div>Cursor</div><div id="cursorInfo" class="value">-</div>
         <div>Selection</div><div id="selectionInfo" class="value">none</div>
       </div>
@@ -471,6 +497,20 @@
       return state.width > 0 && state.height > 0;
     }
 
+    function maskName(idx) {
+      return `Mask ${idx + 1}`;
+    }
+
+    function defaultMaskColor(idx) {
+      const colors = ['#ff4048', '#4bb2ff', '#72d26d', '#f3c64d', '#d36dff', '#ff8a3d'];
+      return colors[idx % colors.length];
+    }
+
+    function ensureMaskSettings(idx) {
+      if (!state.maskColors[idx]) state.maskColors[idx] = defaultMaskColor(idx);
+      if (!Number.isFinite(state.opacity[idx])) state.opacity[idx] = 0.55;
+    }
+
     function colorToRgba(color, alpha) {
       const hex = color.replace('#', '');
       const value = parseInt(hex.length === 3
@@ -511,7 +551,10 @@
     }
 
     function resetMasks() {
-      state.masks = [makeMaskCanvas(), makeMaskCanvas()];
+      state.masks = state.maskColors.map((_, idx) => {
+        ensureMaskSettings(idx);
+        return makeMaskCanvas();
+      });
       state.history = [];
       state.future = [];
       state.selection = null;
@@ -519,6 +562,86 @@
       state.selectionStart = null;
       state.moveStart = null;
       state.cursor = null;
+      renderMaskControls();
+    }
+
+    function renderMaskControls() {
+      const list = el('maskList');
+      if (!list) return;
+      list.innerHTML = '';
+      state.maskColors.forEach((color, idx) => {
+        ensureMaskSettings(idx);
+        const row = document.createElement('div');
+        row.className = `mask-row${idx === state.active ? ' active' : ''}`;
+
+        const selectBtn = document.createElement('button');
+        selectBtn.textContent = maskName(idx);
+        selectBtn.className = idx === state.active ? 'active' : '';
+        selectBtn.addEventListener('click', () => setActive(idx));
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = color;
+        colorInput.title = `${maskName(idx)} color`;
+        colorInput.addEventListener('input', e => {
+          state.maskColors[idx] = e.target.value;
+          syncMaskColorVars();
+          draw();
+        });
+
+        const opacityWrap = document.createElement('div');
+        opacityWrap.className = 'mask-opacity';
+        const opacityValue = document.createElement('span');
+        opacityValue.textContent = `${Math.round(state.opacity[idx] * 100)}%`;
+        const opacityInput = document.createElement('input');
+        opacityInput.type = 'range';
+        opacityInput.min = '0';
+        opacityInput.max = '100';
+        opacityInput.value = String(Math.round(state.opacity[idx] * 100));
+        opacityInput.title = `${maskName(idx)} opacity`;
+        opacityInput.addEventListener('input', e => {
+          state.opacity[idx] = Number(e.target.value) / 100;
+          opacityValue.textContent = `${e.target.value}%`;
+          draw();
+        });
+        opacityWrap.append(opacityValue, opacityInput);
+        row.append(selectBtn, colorInput, opacityWrap);
+        list.appendChild(row);
+      });
+      el('deleteMaskBtn').disabled = state.maskColors.length <= 1;
+    }
+
+    function addMask() {
+      const idx = state.maskColors.length;
+      state.maskColors.push(defaultMaskColor(idx));
+      state.opacity.push(0.55);
+      state.masks.push(hasCanvasSize() ? makeMaskCanvas() : null);
+      setActive(idx);
+      renderSegments();
+      updateInfo();
+      draw();
+    }
+
+    function deleteActiveMask() {
+      if (state.maskColors.length <= 1) return;
+      const removed = state.active;
+      state.maskColors.splice(removed, 1);
+      state.opacity.splice(removed, 1);
+      state.masks.splice(removed, 1);
+      state.history = [];
+      state.future = [];
+      state.selection = null;
+      state.active = Math.max(0, Math.min(removed, state.maskColors.length - 1));
+      state.segments.forEach(segment => {
+        const value = Number(segment.mask);
+        if (!Number.isFinite(value)) return;
+        if (value === removed) segment.mask = 'none';
+        else if (value > removed) segment.mask = String(value - 1);
+      });
+      renderMaskControls();
+      renderSegments();
+      updateInfo();
+      draw();
     }
 
     function setBase(img) {
@@ -552,7 +675,17 @@
         updateInfo();
         updateStatus();
         draw();
+        if (video.duration > 0 && video.currentTime === 0) video.currentTime = Math.min(0.001, video.duration / 2);
       };
+      const drawReadyFrame = () => {
+        if (!state.videoReady) return;
+        updateInfo();
+        updateStatus();
+        draw();
+      };
+      video.onloadeddata = drawReadyFrame;
+      video.oncanplay = drawReadyFrame;
+      video.onseeked = drawReadyFrame;
       video.onended = () => {
         if (el('videoLoop').checked) {
           video.currentTime = 0;
@@ -731,8 +864,7 @@
 
         const maskSelect = document.createElement('select');
         [
-          ['0', 'Mask A'],
-          ['1', 'Mask B'],
+          ...state.maskColors.map((_, idx) => [String(idx), maskName(idx)]),
           ['none', 'None']
         ].forEach(([value, label]) => {
           const option = document.createElement('option');
@@ -961,8 +1093,9 @@
         drawVideoComposite();
       } else {
         ctx.drawImage(state.base, 0, 0);
-        drawMaskOverlay(0, colorToRgba(state.maskColors[0], state.opacity[0]));
-        drawMaskOverlay(1, colorToRgba(state.maskColors[1], state.opacity[1]));
+        state.masks.forEach((_, idx) => {
+          drawMaskOverlay(idx, colorToRgba(state.maskColors[idx], state.opacity[idx]));
+        });
         drawSelection();
         drawCursorPreview();
       }
@@ -984,8 +1117,9 @@
         sctx.drawImage(mask, 0, 0, state.width, state.height);
         ctx.drawImage(stillCutout, 0, 0);
       }
-      drawMaskOverlay(0, colorToRgba(state.maskColors[0], state.opacity[0]));
-      drawMaskOverlay(1, colorToRgba(state.maskColors[1], state.opacity[1]));
+      state.masks.forEach((_, idx) => {
+        drawMaskOverlay(idx, colorToRgba(state.maskColors[idx], state.opacity[idx]));
+      });
       drawSelection();
       drawCursorPreview();
     }
@@ -1059,9 +1193,10 @@
       el('segmentsInfo').textContent = `${state.segments.length}`;
       el('sequenceTotalInfo').textContent = `${sequenceDuration().toFixed(2)}s`;
       el('progressInfo').textContent = state.exportProgress;
-      el('maskAInfo').textContent = maskStats(0);
-      el('maskBInfo').textContent = maskStats(1);
-      el('activeInfo').textContent = state.active === 0 ? 'Mask A' : 'Mask B';
+      el('masksInfo').textContent = state.masks
+        .map((_, idx) => `${maskName(idx)} ${maskStats(idx)}`)
+        .join(' | ');
+      el('activeInfo').textContent = maskName(state.active);
       el('cursorInfo').textContent = state.cursor
         ? `${Math.round(state.cursor.x)}, ${Math.round(state.cursor.y)}`
         : '-';
@@ -1079,21 +1214,22 @@
           return;
         }
         if (state.recording) {
-          el('status').textContent = `${state.width} x ${state.height} | Saving video | ${state.active === 0 ? 'Mask A' : 'Mask B'} | ${state.exportFps} fps`;
+          el('status').textContent = `${state.width} x ${state.height} | Saving video | ${maskName(state.active)} | ${state.exportFps} fps`;
           return;
         }
         const playState = state.videoReady ? (video.paused ? 'paused' : 'playing') : 'no video';
-        el('status').textContent = `${state.width} x ${state.height} | Video paste | ${state.active === 0 ? 'Mask A' : 'Mask B'} | ${playState}`;
+        el('status').textContent = `${state.width} x ${state.height} | Video paste | ${maskName(state.active)} | ${playState}`;
         return;
       }
-      el('status').textContent = `${state.width} x ${state.height} | ${state.active === 0 ? 'Mask A' : 'Mask B'} | ${state.mode} | brush ${state.brush}px`;
+      el('status').textContent = `${state.width} x ${state.height} | ${maskName(state.active)} | ${state.mode} | brush ${state.brush}px`;
     }
 
     function setActive(idx) {
+      if (idx < 0 || idx >= state.maskColors.length) return;
       state.active = idx;
-      el('selectA').classList.toggle('active', idx === 0);
-      el('selectB').classList.toggle('active', idx === 1);
+      renderMaskControls();
       updateInfo();
+      draw();
     }
 
     function setMode(mode) {
@@ -1430,7 +1566,7 @@
       octx.fillStyle = 'white';
       octx.globalCompositeOperation = 'source-over';
       octx.drawImage(state.masks[idx], 0, 0);
-      downloadCanvas(out, idx === 0 ? 'mask_a.png' : 'mask_b.png');
+      downloadCanvas(out, `mask_${idx + 1}.png`);
     }
 
     function exportOverlay() {
@@ -1442,7 +1578,7 @@
       octx.drawImage(state.base, 0, 0);
       const old = ctx;
       const tempCtx = octx;
-      [0, 1].forEach(idx => {
+      state.masks.forEach((_, idx) => {
         const temp = document.createElement('canvas');
         temp.width = state.width;
         temp.height = state.height;
@@ -1526,8 +1662,8 @@
     });
     el('maskAFile').addEventListener('change', e => e.target.files[0] && loadMaskFile(e.target.files[0], 0));
     el('maskBFile').addEventListener('change', e => e.target.files[0] && loadMaskFile(e.target.files[0], 1));
-    el('selectA').addEventListener('click', () => setActive(0));
-    el('selectB').addEventListener('click', () => setActive(1));
+    el('addMaskBtn').addEventListener('click', addMask);
+    el('deleteMaskBtn').addEventListener('click', deleteActiveMask);
     el('paintMode').addEventListener('click', () => setMode('paint'));
     el('eraseMode').addEventListener('click', () => setMode('erase'));
     el('selectMode').addEventListener('click', () => setMode('select'));
@@ -1540,31 +1676,12 @@
     el('nudgeRight').addEventListener('click', () => nudgeSelection(10, 0));
     el('fitBtn').addEventListener('click', () => { fitToScreen(); draw(); });
     el('actualBtn').addEventListener('click', actualSize);
-    el('saveA').addEventListener('click', () => exportMask(0));
+    el('saveA').addEventListener('click', () => exportMask(state.active));
     el('saveB').addEventListener('click', () => exportMask(1));
-    el('saveBoth').addEventListener('click', () => { exportMask(0); setTimeout(() => exportMask(1), 200); });
+    el('saveBoth').addEventListener('click', () => {
+      state.masks.forEach((_, idx) => setTimeout(() => exportMask(idx), idx * 200));
+    });
     el('saveOverlay').addEventListener('click', exportOverlay);
-
-    el('opacityA').addEventListener('input', e => {
-      state.opacity[0] = Number(e.target.value) / 100;
-      el('opacityAValue').textContent = `${e.target.value}%`;
-      draw();
-    });
-    el('opacityB').addEventListener('input', e => {
-      state.opacity[1] = Number(e.target.value) / 100;
-      el('opacityBValue').textContent = `${e.target.value}%`;
-      draw();
-    });
-    el('colorA').addEventListener('input', e => {
-      state.maskColors[0] = e.target.value;
-      syncMaskColorVars();
-      draw();
-    });
-    el('colorB').addEventListener('input', e => {
-      state.maskColors[1] = e.target.value;
-      syncMaskColorVars();
-      draw();
-    });
     el('brushSize').addEventListener('input', e => {
       state.brush = Number(e.target.value);
       el('brushValue').textContent = `${state.brush} px`;
@@ -1749,6 +1866,7 @@
     });
 
     window.addEventListener('resize', resizeCanvas);
+    renderMaskControls();
     syncBusyButtons();
     resizeCanvas();
   </script>
