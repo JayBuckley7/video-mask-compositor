@@ -536,6 +536,11 @@
       video.load();
       video.onloadedmetadata = () => {
         state.videoReady = true;
+        if (!state.base) {
+          state.width = video.videoWidth;
+          state.height = video.videoHeight;
+          fitToScreen();
+        }
         updateInfo();
         updateStatus();
         draw();
@@ -938,14 +943,18 @@
     function draw() {
       const rect = view.getBoundingClientRect();
       ctx.clearRect(0, 0, rect.width, rect.height);
-      if (!state.base) return;
+      if (!state.base && !(state.viewMode === 'video' && state.videoReady)) return;
 
       ctx.save();
       ctx.translate(state.panX, state.panY);
       ctx.scale(state.zoom, state.zoom);
       ctx.imageSmoothingEnabled = true;
       if (state.viewMode === 'video' && state.videoReady) {
-        drawVideoComposite();
+        if (state.base) {
+          drawVideoComposite();
+        } else {
+          ctx.drawImage(video, 0, 0, state.width, state.height);
+        }
       } else {
         ctx.drawImage(state.base, 0, 0);
         drawMaskOverlay(0, colorToRgba(state.maskColors[0], state.opacity[0]));
@@ -1057,7 +1066,7 @@
     }
 
     function updateStatus() {
-      if (!state.base) return;
+      if (!state.base && !(state.viewMode === 'video' && state.videoReady)) return;
       if (state.viewMode === 'video') {
         if (state.sequenceRecording) {
           el('status').textContent = `${state.width} x ${state.height} | Saving sequence | ${state.exportProgress} | ${state.exportFps} fps`;
