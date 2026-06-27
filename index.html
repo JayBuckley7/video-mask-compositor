@@ -81,6 +81,15 @@
 
     input[type="range"] { width: 100%; }
 
+    input[type="color"] {
+      width: 44px;
+      height: 30px;
+      padding: 2px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      cursor: pointer;
+    }
+
     .row {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -313,8 +322,12 @@
       <label>Mask A opacity <span id="opacityAValue" class="value">55%</span></label>
       <input id="opacityA" type="range" min="0" max="100" value="55" />
 
+      <label class="row">Mask A color <input id="colorA" type="color" value="#ff4048" /></label>
+
       <label>Mask B opacity <span id="opacityBValue" class="value">45%</span></label>
       <input id="opacityB" type="range" min="0" max="100" value="45" />
+
+      <label class="row">Mask B color <input id="colorB" type="color" value="#4bb2ff" /></label>
 
       <h2>Brush</h2>
       <div class="segmented tools">
@@ -431,6 +444,7 @@
       active: 0,
       mode: 'paint',
       opacity: [0.55, 0.45],
+      maskColors: ['#ff4048', '#4bb2ff'],
       brush: 36,
       strength: 1,
       zoom: 1,
@@ -452,6 +466,28 @@
     };
 
     const el = id => document.getElementById(id);
+
+    function colorToRgba(color, alpha) {
+      const hex = color.replace('#', '');
+      const value = parseInt(hex.length === 3
+        ? hex.split('').map(char => char + char).join('')
+        : hex, 16);
+      const r = (value >> 16) & 255;
+      const g = (value >> 8) & 255;
+      const b = value & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function syncMaskColorVars() {
+      state.maskColors.forEach((color, idx) => {
+        const hex = color.replace('#', '');
+        const value = parseInt(hex, 16);
+        const r = (value >> 16) & 255;
+        const g = (value >> 8) & 255;
+        const b = value & 255;
+        document.documentElement.style.setProperty(idx === 0 ? '--mask-a' : '--mask-b', `${r}, ${g}, ${b}`);
+      });
+    }
 
     function resizeCanvas() {
       const dpr = window.devicePixelRatio || 1;
@@ -912,8 +948,8 @@
         drawVideoComposite();
       } else {
         ctx.drawImage(state.base, 0, 0);
-        drawMaskOverlay(0, `rgba(255, 64, 72, ${state.opacity[0]})`);
-        drawMaskOverlay(1, `rgba(75, 178, 255, ${state.opacity[1]})`);
+        drawMaskOverlay(0, colorToRgba(state.maskColors[0], state.opacity[0]));
+        drawMaskOverlay(1, colorToRgba(state.maskColors[1], state.opacity[1]));
         drawSelection();
         drawCursorPreview();
       }
@@ -1396,7 +1432,7 @@
         temp.width = state.width;
         temp.height = state.height;
         const tctx = temp.getContext('2d');
-        tctx.fillStyle = idx === 0 ? `rgba(255,64,72,${state.opacity[idx]})` : `rgba(75,178,255,${state.opacity[idx]})`;
+        tctx.fillStyle = colorToRgba(state.maskColors[idx], state.opacity[idx]);
         tctx.fillRect(0, 0, state.width, state.height);
         tctx.globalCompositeOperation = 'destination-in';
         tctx.drawImage(state.masks[idx], 0, 0);
@@ -1502,6 +1538,16 @@
     el('opacityB').addEventListener('input', e => {
       state.opacity[1] = Number(e.target.value) / 100;
       el('opacityBValue').textContent = `${e.target.value}%`;
+      draw();
+    });
+    el('colorA').addEventListener('input', e => {
+      state.maskColors[0] = e.target.value;
+      syncMaskColorVars();
+      draw();
+    });
+    el('colorB').addEventListener('input', e => {
+      state.maskColors[1] = e.target.value;
+      syncMaskColorVars();
       draw();
     });
     el('brushSize').addEventListener('input', e => {
